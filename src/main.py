@@ -1,10 +1,11 @@
+# TODO enum for held items
 import os
 import time
 import utils
-from random import randint, random
+from random import randint, random, choice
 
 
-class Game:
+class Sim:
     TICK_RATE = 20  # ticks per second
     TICK_TIME = 1.0 / TICK_RATE
 
@@ -12,9 +13,9 @@ class Game:
         self.size = size
         self._ants = []
         self._food = []
-        self.pheremone_map = [
-            [[0.0, 0.0] for _ in range(self.size[0])] for _ in range(self.size[1])
-        ]
+        # self.pheremone_map = [
+        #     [[0.0, 0.0] for _ in range(self.size[0])] for _ in range(self.size[1])
+        # ]
         pass
 
     def random_coordinates(self) -> tuple[int, int]:
@@ -31,7 +32,7 @@ class Game:
             start = time.time()
 
             for ant in self._ants:
-                ant.move()
+                ant.act()
             self.render()
 
             elapsed_time = time.time() - start
@@ -44,16 +45,16 @@ class Game:
             food.location = self.random_coordinates()
 
     def render(self):
-        screen = [["*" for _ in range(self.size[0])] for _ in range(self.size[1])]
+        screen = [[" " for _ in range(self.size[0])] for _ in range(self.size[1])]
         # print("Size: ", self.size)
         # print("Screen List: ", len(screen), len(screen[0]))
         # print(screen)
 
         for ant in self._ants:
-            screen[ant.location[1]][ant.location[0]] = "."
+            screen[ant.location[1]][ant.location[0]] = ant.display
 
         for food in self._food:
-            screen[food.location[1]][food.location[0]] = "a"
+            screen[food.location[1]][food.location[0]] = "f"
 
         stringed = ""
         for column in screen:
@@ -62,6 +63,9 @@ class Game:
             stringed += "\n"
 
         print(stringed[:-1], end="")
+
+    def get_random_food(self):
+        return choice(self._food)
 
 
 class Entity:
@@ -76,28 +80,32 @@ class Ant(Entity):
     AXIS_SELECTION_WEIGHT_OFFSET = 0.1
     MOVE_DISTANCE = 1
 
-    def __init__(self, location: tuple[int, int], target: Entity, game: Game) -> None:
+    def __init__(
+        self, location: tuple[int, int], target: Entity, sim: Sim, display: str = "A"
+    ) -> None:
         super().__init__(location)
         self.target = target
-        self._game = game
+        self._sim = sim
+        self._holding = None
+        self.display = display
         pass
 
-        @property
-        def holding(self):
-            return self._holding
+    @property
+    def holding(self):
+        return self._holding
 
-        @holding.setter
-        def holding(self, value):
-            self._holding = value
+    @holding.setter
+    def holding(self, value):
+        self._holding = value
 
     def move(self):
         # find target direction in each axis
         # randomly select axis
         # weighted randomly chose to move towards or away
         #
-        if self.target.location == self.location:
-            self._game.move_food()  # fun idea
-            return
+        # if self.target.location == self.location:
+        #     self._sim.move_food()  # fun idea
+        #     return
 
         directions = (
             -1 if self.target.location[0] < self.location[0] else 1,
@@ -127,10 +135,10 @@ class Ant(Entity):
             utils.clamp(
                 self.location[0] + column_move,
                 min_val=0,
-                max_val=self._game.size[0] - 1,
+                max_val=self._sim.size[0] - 1,
             ),
             utils.clamp(
-                self.location[1] + line_move, min_val=0, max_val=self._game.size[1] - 1
+                self.location[1] + line_move, min_val=0, max_val=self._sim.size[1] - 1
             ),
         )
         pass
@@ -138,10 +146,33 @@ class Ant(Entity):
     def get_direction(self):
         pass
 
+    def act(self) -> None:
+        self.move()
+        pass
+
 
 class Worker(Ant):
-    def __init__(self, location, target, game) -> None:
-        super().__init__(location, target, game)
+    def __init__(self, location, target, sim, queen, display: str = "W") -> None:
+        super().__init__(location, target, sim, display)
+        self._queen = queen
+
+    def act(self):
+        if self.holding is None:
+            self.target = self._sim.get_random_food()
+            pass
+
+        if self.location == self.target.location:
+            match type(self.target):
+                case Food:
+                    self.holding = "food"
+                    pass
+
+        super().move()
+
+
+class Queen(Ant):
+    def __init__(self, location, target, sim, display: str = "Q") -> None:
+        super().__init__(location, target, sim, display)
 
 
 class Food(Entity):
@@ -150,32 +181,38 @@ class Food(Entity):
         pass
 
 
+class Nest(Entity):
+    def __init__(self, location) -> None:
+        super().__init__(location)
+
+
 def main():
     columns, lines = os.get_terminal_size()
     print(columns, lines)
-    game = Game(size=(columns, lines))
+    sim = Sim(size=(columns, lines))
 
-    food = Food((randint(0, columns - 1), randint(0, lines - 1)))
-    game.addFood(food)
+    nest = Nest(sim.random_coordinates())
 
-    ants = [
-        Ant(
-            location=(randint(0, columns - 1), randint(0, lines - 1)),
-            target=food,
-            game=game,
-        )
-        for _ in range(30)
+    queen = Queen(location=sim.random_coordinates(), target=nest, sim=sim)
+    sim.addAnt(queen)
+
+    food = Food(sim.random_coordinates())
+    sim.addFood(food)
+
+    workers = [
+        Worker(location=sim.random_coordinates(), target=food, sim=sim, queen=queen)
+        for _ in range(20)
     ]
 
-    for ant in ants:
-        game.addAnt(ant)
+    for ant in workers:
+        sim.addAnt(ant)
 
     # ant_loc = (randint(0, columns - 1), randint(0, lines - 1))
     # print("ant_loc: ", ant_loc)
     # targ = food.location
     # game.addAnt(Ant(location=ant_loc, target=targ))
 
-    game.run()
+    sim.run()
 
 
 if __name__ == "__main__":
