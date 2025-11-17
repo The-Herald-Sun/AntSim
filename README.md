@@ -1,5 +1,9 @@
 I felt like doing an ant colony sim like thing
 
+## Running
+
+Run from the src directory
+
 ## Ideas
 
 - Walls
