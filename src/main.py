@@ -1,5 +1,6 @@
 import os
 import time
+import utils
 from random import randint, random
 
 
@@ -9,21 +10,27 @@ class Game:
 
     def __init__(self, size: tuple[int, int]) -> None:
         self.size = size
-        self.ants = []
-        self.food = []
+        self._ants = []
+        self._food = []
+        self.pheremone_map = [
+            [[0.0, 0.0] for _ in range(self.size[0])] for _ in range(self.size[1])
+        ]
         pass
 
+    def random_coordinates(self) -> tuple[int, int]:
+        return (randint(0, self.size[0] - 1), randint(0, self.size[1] - 1))
+
     def addAnt(self, ant):
-        self.ants.append(ant)
+        self._ants.append(ant)
 
     def addFood(self, food):
-        self.food.append(food)
+        self._food.append(food)
 
     def run(self):
         while True:
             start = time.time()
 
-            for ant in self.ants:
+            for ant in self._ants:
                 ant.move()
             self.render()
 
@@ -32,16 +39,20 @@ class Game:
             pass
         pass
 
+    def move_food(self):
+        for food in self._food:
+            food.location = self.random_coordinates()
+
     def render(self):
         screen = [["*" for _ in range(self.size[0])] for _ in range(self.size[1])]
         # print("Size: ", self.size)
         # print("Screen List: ", len(screen), len(screen[0]))
         # print(screen)
 
-        for ant in self.ants:
+        for ant in self._ants:
             screen[ant.location[1]][ant.location[0]] = "."
 
-        for food in self.food:
+        for food in self._food:
             screen[food.location[1]][food.location[0]] = "a"
 
         stringed = ""
@@ -59,26 +70,33 @@ class Entity:
         pass
 
 
-# TODO implement better handling of axis selection and add
-# TODO refactor target to be an Entity rather than tuple
-# TODO BOUNDS CHECKING
+# TODO implement better handling of axis selection
 class Ant(Entity):
     MOVE_WEIGHT = 0.75  # likelyhood ant moves towards target
-    AXIS_SELECTION_WEIGHT_OFFSET = 0.2
+    AXIS_SELECTION_WEIGHT_OFFSET = 0.1
     MOVE_DISTANCE = 1
 
-    def __init__(self, location: tuple[int, int], target: Entity) -> None:
+    def __init__(self, location: tuple[int, int], target: Entity, game: Game) -> None:
         super().__init__(location)
         self.target = target
+        self._game = game
         pass
 
-    # TODO down weight axis if already aligned
+        @property
+        def holding(self):
+            return self._holding
+
+        @holding.setter
+        def holding(self, value):
+            self._holding = value
+
     def move(self):
         # find target direction in each axis
         # randomly select axis
         # weighted randomly chose to move towards or away
         #
         if self.target.location == self.location:
+            self._game.move_food()  # fun idea
             return
 
         directions = (
@@ -105,13 +123,25 @@ class Ant(Entity):
             case False:
                 line_move = self.MOVE_DISTANCE * directions[1]
 
-        self.location = (self.location[0] + column_move, self.location[1] + line_move)
+        self.location = (
+            utils.clamp(
+                self.location[0] + column_move,
+                min_val=0,
+                max_val=self._game.size[0] - 1,
+            ),
+            utils.clamp(
+                self.location[1] + line_move, min_val=0, max_val=self._game.size[1] - 1
+            ),
+        )
+        pass
+
+    def get_direction(self):
         pass
 
 
 class Worker(Ant):
-    def __init__(self, location, target) -> None:
-        super().__init__(location, target)
+    def __init__(self, location, target, game) -> None:
+        super().__init__(location, target, game)
 
 
 class Food(Entity):
@@ -132,8 +162,9 @@ def main():
         Ant(
             location=(randint(0, columns - 1), randint(0, lines - 1)),
             target=food,
+            game=game,
         )
-        for _ in range(10)
+        for _ in range(30)
     ]
 
     for ant in ants:
