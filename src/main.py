@@ -4,7 +4,7 @@ from random import randint, random
 
 
 class Game:
-    TICK_RATE = 10  # ticks per second
+    TICK_RATE = 20  # ticks per second
     TICK_TIME = 1.0 / TICK_RATE
 
     def __init__(self, size: tuple[int, int]) -> None:
@@ -59,26 +59,31 @@ class Entity:
         pass
 
 
+# TODO implement better handling of axis selection and add
+# TODO refactor target to be an Entity rather than tuple
+# TODO BOUNDS CHECKING
 class Ant(Entity):
-    MOVE_WEIGHT = 0.85  # likelyhood ant moves towards target
+    MOVE_WEIGHT = 0.75  # likelyhood ant moves towards target
+    AXIS_SELECTION_WEIGHT_OFFSET = 0.2
     MOVE_DISTANCE = 1
 
-    def __init__(self, location: tuple[int, int], target: tuple[int, int]) -> None:
+    def __init__(self, location: tuple[int, int], target: Entity) -> None:
         super().__init__(location)
         self.target = target
         pass
 
+    # TODO down weight axis if already aligned
     def move(self):
         # find target direction in each axis
         # randomly select axis
         # weighted randomly chose to move towards or away
         #
-        if self.target == self.location:
+        if self.target.location == self.location:
             return
 
         directions = (
-            -1 if self.target[0] < self.location[0] else 1,
-            -1 if self.target[1] < self.location[1] else 1,
+            -1 if self.target.location[0] < self.location[0] else 1,
+            -1 if self.target.location[1] < self.location[1] else 1,
         )
 
         if random() > self.MOVE_WEIGHT:
@@ -86,10 +91,18 @@ class Ant(Entity):
 
         column_move = 0
         line_move = 0
-        match randint(0, 1):
-            case 0:
+
+        if self.target.location[0] == self.location[0]:
+            axis_selection_weight_offset = self.AXIS_SELECTION_WEIGHT_OFFSET * 1
+        elif self.target.location[1] == self.location[1]:
+            axis_selection_weight_offset = self.AXIS_SELECTION_WEIGHT_OFFSET * -1
+        else:
+            axis_selection_weight_offset = 0.0
+
+        match random() > 0.5 + axis_selection_weight_offset:
+            case True:
                 column_move = self.MOVE_DISTANCE * directions[0]
-            case 1:
+            case False:
                 line_move = self.MOVE_DISTANCE * directions[1]
 
         self.location = (self.location[0] + column_move, self.location[1] + line_move)
@@ -115,11 +128,21 @@ def main():
     food = Food((randint(0, columns - 1), randint(0, lines - 1)))
     game.addFood(food)
 
-    ant_loc = (randint(0, columns - 1), randint(0, lines - 1))
-    print("ant_loc: ", ant_loc)
-    targ = food.location
+    ants = [
+        Ant(
+            location=(randint(0, columns - 1), randint(0, lines - 1)),
+            target=food,
+        )
+        for _ in range(10)
+    ]
 
-    game.addAnt(Ant(location=ant_loc, target=targ))
+    for ant in ants:
+        game.addAnt(ant)
+
+    # ant_loc = (randint(0, columns - 1), randint(0, lines - 1))
+    # print("ant_loc: ", ant_loc)
+    # targ = food.location
+    # game.addAnt(Ant(location=ant_loc, target=targ))
 
     game.run()
 
