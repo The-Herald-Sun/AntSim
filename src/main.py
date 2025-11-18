@@ -1,5 +1,5 @@
 # TODO have entities handle adding themselves to the sim
-# TODO enum for held items
+# TODO enum/class for held items
 import os
 import time
 import utils
@@ -35,6 +35,7 @@ class Sim:
 
     def addFood(self, food):
         self._food.append(food)
+        self._entities.append(food)
 
     def run(self):
         stdout.write(SAVE_SCREEN + CLEAR_SCREEN)
@@ -64,7 +65,12 @@ class Sim:
             screen[ant.location[1]][ant.location[0]] = ant.display
 
         for food in self._food:
-            screen[food.location[1]][food.location[0]] = "f"
+            screen[food.location[1]][food.location[0]] = food.display
+
+        # for entity in self._entities:
+        #     screen[entity.location[1]][entity.location[0]] = (
+        #         entity.display if entity.display is not None else " "
+        #     )
 
         stringed = ""
         for column in screen:
@@ -77,12 +83,16 @@ class Sim:
     def get_random_food(self):
         return choice(self._food)
 
+    def addEntity(self, entity):
+        self._entities.append(entity)
+
 
 class Entity:
-    def __init__(self, location: tuple[int, int]) -> None:
+    def __init__(self, sim: Sim, location: tuple[int, int], display=None) -> None:
         self.location = location
-        # self._sim = sim
-        # self._sim
+        self.display = display
+        self._sim = sim
+        self._sim.addEntity(self)
         pass
 
     def tick(self):
@@ -96,13 +106,12 @@ class Ant(Entity):
     MOVE_DISTANCE = 1
 
     def __init__(
-        self, location: tuple[int, int], target: Entity, sim: Sim, display: str = "A"
+        self, sim: Sim, location: tuple[int, int], target: Entity, display: str = "A"
     ) -> None:
-        super().__init__(location)
+        super().__init__(sim, location, display)
         self.target = target
         self._sim = sim
         self._holding = None
-        self.display = display
         pass
 
     @property
@@ -141,10 +150,10 @@ class Ant(Entity):
             axis_selection_weight_offset = 0.0
 
         match random() > 0.5 + axis_selection_weight_offset:
-            case True:
-                column_move = self.MOVE_DISTANCE * directions[0]
             case False:
                 line_move = self.MOVE_DISTANCE * directions[1]
+            case True:
+                column_move = self.MOVE_DISTANCE * directions[0]
 
         self.location = (
             utils.clamp(
@@ -167,8 +176,8 @@ class Ant(Entity):
 
 
 class Worker(Ant):
-    def __init__(self, location, target, sim, queen, display: str = "W") -> None:
-        super().__init__(location, target, sim, display)
+    def __init__(self, location, target, sim: Sim, queen, display: str = "W") -> None:
+        super().__init__(sim=sim, location=location, target=target, display=display)
         self._queen = queen
 
     def tick(self):
@@ -193,8 +202,8 @@ class Worker(Ant):
 class Queen(Ant):
     ON_TARGET_MOVE_CHANCE = 0.1
 
-    def __init__(self, location, target, sim, display: str = "Q") -> None:
-        super().__init__(location, target, sim, display)
+    def __init__(self, sim: Sim, location, target, display: str = "Q") -> None:
+        super().__init__(sim, location, target, display)
 
     def move(self):
         if self.target.location == self.location:
@@ -208,26 +217,26 @@ class Queen(Ant):
 
 
 class Food(Entity):
-    def __init__(self, location) -> None:
-        super().__init__(location)
+    def __init__(self, sim: Sim, location, display="f") -> None:
+        super().__init__(sim, location, display)
         pass
 
 
 class Nest(Entity):
-    def __init__(self, location) -> None:
-        super().__init__(location)
+    def __init__(self, sim: Sim, location) -> None:
+        super().__init__(sim, location)
 
 
 def main():
     columns, lines = os.get_terminal_size()
     sim = Sim(size=(columns, lines))
 
-    nest = Nest(sim.random_coordinates())
+    nest = Nest(sim=sim, location=sim.random_coordinates())
 
     queen = Queen(location=sim.random_coordinates(), target=nest, sim=sim)
     sim.addAnt(queen)
 
-    food = Food(sim.random_coordinates())
+    food = Food(sim, sim.random_coordinates())
     sim.addFood(food)
 
     workers = [
