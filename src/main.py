@@ -13,6 +13,8 @@ class Sim:
         self.size = size
         self._ants = []
         self._food = []
+        self._entities = []
+        # Could be a fun idea. Leave for later.
         # self.pheremone_map = [
         #     [[0.0, 0.0] for _ in range(self.size[0])] for _ in range(self.size[1])
         # ]
@@ -22,6 +24,7 @@ class Sim:
         return (randint(0, self.size[0] - 1), randint(0, self.size[1] - 1))
 
     def addAnt(self, ant):
+        self._entities.append(ant)
         self._ants.append(ant)
 
     def addFood(self, food):
@@ -31,8 +34,8 @@ class Sim:
         while True:
             start = time.time()
 
-            for ant in self._ants:
-                ant.act()
+            for entity in self._entities:
+                entity.tick()
             self.render()
 
             elapsed_time = time.time() - start
@@ -71,6 +74,11 @@ class Sim:
 class Entity:
     def __init__(self, location: tuple[int, int]) -> None:
         self.location = location
+        # self._sim = sim
+        # self._sim
+        pass
+
+    def tick(self):
         pass
 
 
@@ -146,7 +154,7 @@ class Ant(Entity):
     def get_direction(self):
         pass
 
-    def act(self) -> None:
+    def tick(self) -> None:
         self.move()
         pass
 
@@ -156,23 +164,40 @@ class Worker(Ant):
         super().__init__(location, target, sim, display)
         self._queen = queen
 
-    def act(self):
+    def tick(self):
         if self.holding is None:
             self.target = self._sim.get_random_food()
             pass
 
         if self.location == self.target.location:
-            match type(self.target):
-                case Food:
+            match self.target:
+                case Food():
                     self.holding = "food"
+                    self.target = self._queen
+                    pass
+                case Queen():
+                    self.holding = None
+                    self.target = self._sim.get_random_food()
                     pass
 
         super().move()
 
 
 class Queen(Ant):
+    ON_TARGET_MOVE_CHANCE = 0.1
+
     def __init__(self, location, target, sim, display: str = "Q") -> None:
         super().__init__(location, target, sim, display)
+
+    def move(self):
+        if self.target.location == self.location:
+            if random() < self.ON_TARGET_MOVE_CHANCE:
+                super().move()
+        else:
+            super().move()
+
+    def tick(self):
+        self.move()
 
 
 class Food(Entity):
