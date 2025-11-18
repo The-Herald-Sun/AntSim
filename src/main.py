@@ -1,8 +1,14 @@
+# TODO have entities handle adding themselves to the sim
 # TODO enum for held items
 import os
 import time
 import utils
 from random import randint, random, choice
+from sys import stdout
+
+SAVE_SCREEN = "\033[?1049h"
+RESTORE_SCREEN = "\033[?1049l"
+CLEAR_SCREEN = "\033[2J"
 
 
 class Sim:
@@ -31,6 +37,7 @@ class Sim:
         self._food.append(food)
 
     def run(self):
+        stdout.write(SAVE_SCREEN + CLEAR_SCREEN)
         while True:
             start = time.time()
 
@@ -213,7 +220,6 @@ class Nest(Entity):
 
 def main():
     columns, lines = os.get_terminal_size()
-    print(columns, lines)
     sim = Sim(size=(columns, lines))
 
     nest = Nest(sim.random_coordinates())
@@ -246,5 +252,6 @@ if __name__ == "__main__":
         pass
     except KeyboardInterrupt:
         print("\nClosing")
+        stdout.write(RESTORE_SCREEN)
         pass
     pass
